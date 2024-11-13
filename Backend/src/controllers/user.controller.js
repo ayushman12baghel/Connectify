@@ -49,7 +49,7 @@ const register = async (req, res) => {
     });
 
     await newUser.save();
-    res.status(httpStatus.CREATED).json({ message: "User saved to Database" });
+    res.status(httpStatus.CREATED).json({ message: "User Registered" });
   } catch (e) {
     res.json({ message: `Something went wrong ${e}` });
   }
