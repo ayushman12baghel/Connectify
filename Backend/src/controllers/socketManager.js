@@ -15,6 +15,7 @@ export const connectToSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
+    console.log("Something Connected");
     socket.on("join-call", (path) => {
       if (connections[path] == undefined) {
         connections[path] = [];
@@ -35,7 +36,7 @@ export const connectToSocket = (server) => {
         for (let a = 0; a < messages[path].length; ++a) {
           io.to(socket.id).emit(
             "chat-message",
-            message[path][a]["date"],
+            messages[path][a]["date"],
             messages[path][a]["sender"],
             messages[path][a]["socket-id-sender"]
           );
@@ -86,7 +87,8 @@ export const connectToSocket = (server) => {
           if (v[a] == socket.id) {
             key = k;
             for (let b = 0; b < connections[key].length; ++b) {
-              io.to(connections[key][b].emit("user-left", socket.id));
+              const socketId = connections[key][b];
+              io.to(socketId).emit("user-left", socket.id);
             }
 
             var index = connections[key].indexOf(socket.id);
