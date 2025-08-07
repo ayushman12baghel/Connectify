@@ -20,12 +20,7 @@ app.set("port", process.env.PORT || 8000);
 
 // CORS configuration for production
 const corsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "http://localhost:5173", // Vite dev server
-    "https://your-vercel-app.vercel.app", // Replace with your actual Vercel URL
-    process.env.CLIENT_URL // From environment variable
-  ].filter(Boolean), // Remove undefined values
+  origin: "*", // Allow all origins for now
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
@@ -34,6 +29,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "40kb" }));
 app.use(express.urlencoded({ limit: "40kb", extended: true }));
+
+// Test route
+app.get("/api/test", (req, res) => {
+  res.json({ message: "Backend is working!" });
+});
 
 app.use("/api/v1/users", userRoutes);
 
