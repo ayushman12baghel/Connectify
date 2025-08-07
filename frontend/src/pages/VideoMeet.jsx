@@ -14,7 +14,10 @@ import ChatIcon from '@mui/icons-material/Chat'
 import server from '../environment';
 import { useNavigate } from 'react-router-dom';
 
-const server_url = server;
+// Socket.io connects to the root of the server, not the API path
+const server_url = process.env.NODE_ENV === "production" ? 
+    "https://connectify-yju7.onrender.com" : 
+    "http://localhost:8000";
 
 var connections = {};
 
@@ -72,6 +75,18 @@ export default function VideoMeetComponent() {
     useEffect(() => {
         console.log("HELLO")
         getPermissions();
+        
+        // Cleanup function to prevent duplicate connections
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+            // Stop local media streams
+            if (window.localStream) {
+                window.localStream.getTracks().forEach(track => track.stop());
+            }
+        }
     }, []) // Add dependency array to prevent infinite loop
 
     let getDislayMedia = () => {
@@ -406,19 +421,43 @@ export default function VideoMeetComponent() {
 
 
     let connectToSocketServer = () => {
+        // Prevent multiple connections
+        if (socketRef.current && socketRef.current.connected) {
+            console.log('Socket already connected, skipping...');
+            return;
+        }
+
         socketRef.current = io.connect(server_url, { 
             secure: true,
-            transports: ['websocket', 'polling'] // Allow both WebSocket and polling
+            transports: ['websocket', 'polling'],
+            forceNew: true, // Force new connection to prevent duplicates
+            reconnection: true,
+            timeout: 20000
         })
 
         socketRef.current.on('signal', gotMessageFromServer)
 
+        // Add connection error handling
+        socketRef.current.on('connect_error', (error) => {
+            console.error('❌ Socket connection error:', error);
+            console.error('❌ Trying to connect to:', server_url);
+        })
+
+        socketRef.current.on('disconnect', (reason) => {
+            console.log('🔌 Socket disconnected:', reason);
+        })
+
+        socketRef.current.on('reconnect', (attemptNumber) => {
+            console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+        })
+
         socketRef.current.on('connect', () => {
             // Use the globally stored username to ensure it's not lost during state updates
             const usernameToSend = window.currentUsername || username || 'Anonymous';
-            console.log('🔗 Socket connected, sending join-call with username:', usernameToSend);
-            console.log('🔗 Current username state:', username);
-            console.log('🔗 Global username:', window.currentUsername);
+            console.log('🔗 Socket connected successfully!');
+            console.log('🔗 Connected to:', server_url);
+            console.log('🔗 Socket ID:', socketRef.current.id);
+            console.log('🔗 Sending join-call with username:', usernameToSend);
             
             socketRef.current.emit('join-call', window.location.href, usernameToSend)
             socketIdRef.current = socketRef.current.id

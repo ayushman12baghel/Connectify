@@ -52,18 +52,18 @@ const start = async () => {
   }
 };
 
-// For Vercel serverless deployment
+// For deployment
 if (process.env.VERCEL) {
-  // Connect to MongoDB for serverless
+  // Connect to MongoDB for serverless (not used anymore since we moved to Render)
   mongoose.connect(dbUrl).then(() => {
     console.log("MongoDB connected for serverless deployment");
   }).catch(error => {
     console.error("Error connecting to MongoDB:", error.message);
   });
 } else {
-  // For local development
+  // For Render and local development - this starts the HTTP server with Socket.io
   start();
 }
 
-// Export the app for Vercel
+// Export the app for any serverless platforms
 export default app;
