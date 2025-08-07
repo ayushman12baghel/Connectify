@@ -408,7 +408,7 @@ export default function VideoMeetComponent() {
     let connectToSocketServer = () => {
         socketRef.current = io.connect(server_url, { 
             secure: true,
-            transports: ['polling'] // Force polling instead of WebSocket
+            transports: ['websocket', 'polling'] // Allow both WebSocket and polling
         })
 
         socketRef.current.on('signal', gotMessageFromServer)
