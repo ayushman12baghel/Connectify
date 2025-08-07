@@ -13,6 +13,16 @@ export const connectToSocket = (server) => {
       allowedHeaders: ["*"],
       credentials: true,
     },
+    // Production-specific settings for Render
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    // Enable sticky sessions for production
+    sticky: true,
+    // Prevent connection issues in production
+    allowUpgrades: true,
+    maxHttpBufferSize: 1e6
   });
 
   io.on("connection", (socket) => {
@@ -25,7 +35,15 @@ export const connectToSocket = (server) => {
       if (connections[path] == undefined) {
         connections[path] = [];
       }
+      
+      // PRODUCTION FIX: Prevent duplicate socket IDs in the same room
+      if (connections[path].includes(socket.id)) {
+        console.log(`⚠️ Socket ${socket.id} already in room ${path} - preventing duplicate`);
+        return; // Don't add duplicate
+      }
+      
       connections[path].push(socket.id);
+      console.log(`✅ Added ${socket.id} to room ${path}. Total participants: ${connections[path].length}`);
 
       // Store username for this socket - ENHANCED: Ensure username is stored correctly
       if (username && typeof username === 'string' && username.trim()) {

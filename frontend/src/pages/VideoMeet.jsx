@@ -76,8 +76,18 @@ export default function VideoMeetComponent() {
         console.log("HELLO")
         getPermissions();
         
+        // Production fix: Add window beforeunload cleanup
+        const handleBeforeUnload = () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
+        };
+        
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        
         // Cleanup function to prevent duplicate connections
         return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
             if (socketRef.current) {
                 socketRef.current.disconnect();
                 socketRef.current = null;
@@ -430,9 +440,14 @@ export default function VideoMeetComponent() {
         socketRef.current = io.connect(server_url, { 
             secure: true,
             transports: ['websocket', 'polling'],
-            forceNew: true, // Force new connection to prevent duplicates
+            forceNew: false, // Changed: Don't force new connections in production
             reconnection: true,
-            timeout: 20000
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 20000,
+            // Production-specific settings
+            upgrade: true,
+            rememberUpgrade: true
         })
 
         socketRef.current.on('signal', gotMessageFromServer)
