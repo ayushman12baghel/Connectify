@@ -93,9 +93,15 @@ export const AuthProvider = ({ children }) => {
         }
     }
 
+    const handleLogout = () => {
+        localStorage.removeItem("token");
+        setUserData(null);
+        router("/home");
+    }
+
 
     const data = {
-        userData, setUserData, addToUserHistory, getHistoryOfUser, handleRegister, handleLogin
+        userData, setUserData, addToUserHistory, getHistoryOfUser, handleRegister, handleLogin, handleLogout
     }
 
     return (

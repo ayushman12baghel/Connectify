@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 let connections = {};
 let messages = {};
 let timeOnline = {};
+let usernames = {}; // Store usernames for each socket
 
 export const connectToSocket = (server) => {
   const io = new Server(server, {
@@ -16,19 +17,62 @@ export const connectToSocket = (server) => {
 
   io.on("connection", (socket) => {
     console.log("Something Connected");
-    socket.on("join-call", (path) => {
+    
+    // Handle user joining with username
+    socket.on("join-call", (path, username) => {
+      console.log(`📞 JOIN-CALL received: path=${path}, username="${username}", socketId=${socket.id}`);
+      
       if (connections[path] == undefined) {
         connections[path] = [];
       }
       connections[path].push(socket.id);
 
+      // Store username for this socket - ENHANCED: Ensure username is stored correctly
+      if (username && typeof username === 'string' && username.trim()) {
+        const cleanUsername = username.trim();
+        usernames[socket.id] = cleanUsername;
+        console.log(`✅ Stored username: "${cleanUsername}" for socket: ${socket.id}`);
+      } else {
+        console.log(`⚠️ Invalid username provided for socket: ${socket.id}, received:`, typeof username, username);
+        usernames[socket.id] = `Anonymous-${socket.id.slice(-4)}`;
+      }
+
       timeOnline[socket.id] = new Date();
 
+      console.log(`📊 Current usernames:`, usernames);
+      console.log(`📊 Current connections for ${path}:`, connections[path]);
+
+      // Send user-joined event with usernames - IMPROVED
       for (let a = 0; a < connections[path].length; a++) {
-        io.to(connections[path][a]).emit(
+        const targetSocketId = connections[path][a];
+        
+        // Create clients with usernames array with better mapping
+        const clientsWithUsernames = connections[path].map(id => {
+          const actualUsername = usernames[id];
+          console.log(`🔍 Mapping socket ${id} to username: "${actualUsername}"`);
+          
+          // Don't send Unknown usernames if we have actual usernames
+          const usernameToSend = actualUsername && !actualUsername.startsWith('Anonymous-') 
+            ? actualUsername 
+            : (actualUsername || `User ${id.slice(-4)}`);
+            
+          return {
+            socketId: id,
+            username: usernameToSend
+          };
+        });
+        
+        console.log(`📤 Sending to ${targetSocketId}:`, {
+          newUserId: socket.id,
+          allClients: connections[path],
+          clientsWithUsernames: clientsWithUsernames
+        });
+        
+        io.to(targetSocketId).emit(
           "user-joined",
           socket.id,
-          connections[path]
+          connections[path],
+          clientsWithUsernames
         );
       }
 
@@ -79,6 +123,9 @@ export const connectToSocket = (server) => {
     socket.on("disconnect", () => {
       var diffTime = Math.abs(timeOnline[socket.id] - new Date());
 
+      // Clean up username
+      delete usernames[socket.id];
+
       var key;
       for (const [k, v] of JSON.parse(
         JSON.stringify(Object.entries(connections))
@@ -99,6 +146,17 @@ export const connectToSocket = (server) => {
             }
           }
         }
+      }
+      
+      // Clean up username when socket disconnects
+      if (usernames[socket.id]) {
+        console.log(`🧹 Cleaning up username for disconnected socket: ${socket.id} (${usernames[socket.id]})`);
+        delete usernames[socket.id];
+      }
+      
+      // Clean up time tracking
+      if (timeOnline[socket.id]) {
+        delete timeOnline[socket.id];
       }
     });
   });

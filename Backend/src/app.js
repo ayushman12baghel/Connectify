@@ -18,7 +18,20 @@ const io = connectToSocket(server);
 
 app.set("port", process.env.PORT || 8000);
 
-app.use(cors());
+// CORS configuration for production
+const corsOptions = {
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:5173", // Vite dev server
+    "https://your-vercel-app.vercel.app", // Replace with your actual Vercel URL
+    process.env.CLIENT_URL // From environment variable
+  ].filter(Boolean), // Remove undefined values
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "40kb" }));
 app.use(express.urlencoded({ limit: "40kb", extended: true }));
 
