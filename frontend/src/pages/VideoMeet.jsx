@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import io from "socket.io-client";
 import { Badge, IconButton, TextField } from '@mui/material';
 import { Button } from '@mui/material';
@@ -475,6 +475,17 @@ export default function VideoMeetComponent() {
                 console.log("- Clients with usernames:", clientsWithUsernames);
                 console.log("- My ID:", socketIdRef.current);
                 console.log("- Am I the new user?", id === socketIdRef.current);
+                
+                // Prevent processing if this is a duplicate event
+                if (window.lastUserJoinedEvent && 
+                    window.lastUserJoinedEvent.id === id && 
+                    window.lastUserJoinedEvent.timestamp > Date.now() - 1000) {
+                    console.log("🚫 DUPLICATE USER JOINED EVENT DETECTED - IGNORING");
+                    return;
+                }
+                
+                // Store this event to prevent duplicates
+                window.lastUserJoinedEvent = { id, timestamp: Date.now() };
                 
                 // Store usernames for all clients - ENHANCED MAPPING
                 const userMap = {};
@@ -1007,11 +1018,8 @@ export default function VideoMeetComponent() {
     let closeChat = () => {
         setModal(false);
     }
-    let handleMessage = (e) => {
-        setMessage(e.target.value);
-    }
 
-    const addMessage = (data, sender, socketIdSender) => {
+    const addMessage = useCallback((data, sender, socketIdSender) => {
         setMessages((prevMessages) => [
             ...prevMessages,
             { sender: sender, data: data }
@@ -1019,17 +1027,19 @@ export default function VideoMeetComponent() {
         if (socketIdSender !== socketIdRef.current) {
             setNewMessages((prevNewMessages) => prevNewMessages + 1);
         }
-    };
+    }, []);
 
+    const handleMessage = useCallback((e) => {
+        setMessage(e.target.value);
+    }, []);
 
-
-    let sendMessage = () => {
-        console.log(socketRef.current);
-        socketRef.current.emit('chat-message', message, username)
-        setMessage("");
-
-        // this.setState({ message: "", sender: username })
-    }
+    const sendMessage = useCallback(() => {
+        if (socketRef.current && message.trim()) {
+            console.log('Sending message:', message);
+            socketRef.current.emit('chat-message', message, username)
+            setMessage("");
+        }
+    }, [message, username]);
 
     
     // Function to manually restart video stream
@@ -1693,17 +1703,13 @@ Video Element Status:
 
                         {/* Other participants' videos */}
                         {videos.map((video, index) => {
-                            console.log("🎬 RENDERING PARTICIPANT VIDEO:", index + 2);
-                            console.log("- Socket ID:", video.socketId);
-                            console.log("- Has Stream:", !!video.stream);
-                            console.log("- Stream ID:", video.stream?.id);
-                            console.log("- Video Tracks:", video.stream?.getVideoTracks()?.length || 0);
-                            console.log("- Audio Tracks:", video.stream?.getAudioTracks()?.length || 0);
-                            console.log("- Has Video:", video.hasVideo);
-                            console.log("- Has Audio:", video.hasAudio);
+                            // Only log when necessary to prevent spam
+                            if (index === 0) {
+                                console.log("🎬 RENDERING", videos.length, "PARTICIPANT VIDEO(S)");
+                            }
                             
                             return (
-                            <div key={video.socketId} style={{
+                            <div key={`${video.socketId}-${video.created || index}`} style={{
                                 position: 'relative',
                                 background: '#333',
                                 borderRadius: '8px',

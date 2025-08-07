@@ -77,10 +77,11 @@ export const connectToSocket = (server) => {
       }
 
       if (messages[path] != undefined) {
+        console.log(`📋 Loading ${messages[path].length} historical messages for new user`);
         for (let a = 0; a < messages[path].length; ++a) {
           io.to(socket.id).emit(
             "chat-message",
-            messages[path][a]["date"],
+            messages[path][a]["data"],
             messages[path][a]["sender"],
             messages[path][a]["socket-id-sender"]
           );
@@ -112,9 +113,10 @@ export const connectToSocket = (server) => {
           data: data,
           "socket-id-sender": socket.id,
         });
-        console.log("message", key, ":", sender, data);
+        console.log("📨 Broadcasting message from", sender, ":", data);
 
-        connections[matchingRoom].array.forEach((element) => {
+        connections[matchingRoom].forEach((element) => {
+          console.log("📤 Sending message to socket:", element);
           io.to(element).emit("chat-message", data, sender, socket.id);
         });
       }
