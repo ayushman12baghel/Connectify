@@ -52,4 +52,18 @@ const start = async () => {
   }
 };
 
-start();
+// For Vercel serverless deployment
+if (process.env.VERCEL) {
+  // Connect to MongoDB for serverless
+  mongoose.connect(dbUrl).then(() => {
+    console.log("MongoDB connected for serverless deployment");
+  }).catch(error => {
+    console.error("Error connecting to MongoDB:", error.message);
+  });
+} else {
+  // For local development
+  start();
+}
+
+// Export the app for Vercel
+export default app;
