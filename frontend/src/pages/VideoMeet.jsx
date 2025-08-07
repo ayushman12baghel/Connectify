@@ -445,15 +445,15 @@ export default function VideoMeetComponent() {
 
         socketRef.current = io.connect(server_url, { 
             secure: true,
-            transports: ['websocket', 'polling'],
-            forceNew: false, // Changed: Don't force new connections in production
+            transports: ['polling'], // FORCE polling only - Render WebSocket issues
+            forceNew: false,
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
             timeout: 20000,
             // Production-specific settings
-            upgrade: true,
-            rememberUpgrade: true
+            upgrade: false, // Disable WebSocket upgrade
+            rememberUpgrade: false
         })
 
         // DEBUG: Expose socket immediately for console debugging

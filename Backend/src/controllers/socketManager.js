@@ -17,13 +17,12 @@ export const connectToSocket = (server) => {
       allowedHeaders: ["*"],
       credentials: true,
     },
-    // Render-compatible settings
-    transports: ['websocket', 'polling'],
+    // RENDER FIX: Force polling only - WebSocket not working
+    transports: ['polling'],
     pingTimeout: 60000,
     pingInterval: 25000,
-    allowUpgrades: true,
+    allowUpgrades: false, // Disable WebSocket upgrade
     maxHttpBufferSize: 1e6,
-    // Remove sticky - not supported in constructor
     connectTimeout: 45000
   });
 
