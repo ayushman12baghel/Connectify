@@ -35,6 +35,19 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "Backend is working!" });
 });
 
+// Health check with server info
+app.get("/api/health", (req, res) => {
+  const uptime = process.uptime();
+  const memUsage = process.memoryUsage();
+  res.json({ 
+    status: "healthy",
+    uptime: `${Math.floor(uptime)}s`,
+    memory: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 app.use("/api/v1/users", userRoutes);
 
 const dbUrl = process.env.DB_URL;

@@ -433,9 +433,15 @@ export default function VideoMeetComponent() {
     let connectToSocketServer = () => {
         // Prevent multiple connections
         if (socketRef.current && socketRef.current.connected) {
-            console.log('Socket already connected, skipping...');
+            console.log('🔄 Socket already connected, skipping...');
             return;
         }
+
+        console.log('🌍 PRODUCTION DEBUG: Connecting to Socket.io server');
+        console.log('🔗 Server URL:', server_url);
+        console.log('📍 Environment:', process.env.NODE_ENV);
+        console.log('👤 Username:', window.currentUsername || username);
+        console.log('🆔 Current Socket ID (if exists):', socketRef.current?.id);
 
         socketRef.current = io.connect(server_url, { 
             secure: true,
@@ -450,20 +456,29 @@ export default function VideoMeetComponent() {
             rememberUpgrade: true
         })
 
+        // DEBUG: Expose socket immediately for console debugging
+        window.debugSocket = socketRef.current;
+        window.socketRef = socketRef;
+        console.log('🔧 DEBUG: Socket created and exposed to window.debugSocket');
+        console.log('🔧 Socket state:', socketRef.current.connected ? 'connected' : 'connecting...');
+
         socketRef.current.on('signal', gotMessageFromServer)
 
         // Add connection error handling
         socketRef.current.on('connect_error', (error) => {
             console.error('❌ Socket connection error:', error);
             console.error('❌ Trying to connect to:', server_url);
+            console.error('❌ Error details:', error.message);
         })
 
         socketRef.current.on('disconnect', (reason) => {
             console.log('🔌 Socket disconnected:', reason);
+            console.log('🔌 Socket ID was:', socketRef.current?.id);
         })
 
         socketRef.current.on('reconnect', (attemptNumber) => {
             console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+            console.log('🔄 New Socket ID:', socketRef.current?.id);
         })
 
         socketRef.current.on('connect', () => {
@@ -473,6 +488,12 @@ export default function VideoMeetComponent() {
             console.log('🔗 Connected to:', server_url);
             console.log('🔗 Socket ID:', socketRef.current.id);
             console.log('🔗 Sending join-call with username:', usernameToSend);
+            console.log('🔗 URL path:', window.location.href);
+            
+            // DEBUG: Expose socket to window for console debugging
+            window.debugSocket = socketRef.current;
+            window.socketRef = socketRef;
+            console.log('🔧 DEBUG: Socket exposed to window.debugSocket');
             
             socketRef.current.emit('join-call', window.location.href, usernameToSend)
             socketIdRef.current = socketRef.current.id
@@ -480,66 +501,67 @@ export default function VideoMeetComponent() {
             socketRef.current.on('chat-message', addMessage)
 
             socketRef.current.on('user-left', (id) => {
+                console.log('👋 USER LEFT:', id);
+                console.log('📊 Videos before removal:', videos.length);
                 setVideos((videos) => videos.filter((video) => video.socketId !== id))
+                console.log('📊 Videos after removal should be:', videos.filter((video) => video.socketId !== id).length);
             })
 
             socketRef.current.on('user-joined', (id, clients, clientsWithUsernames) => {
-                console.log(" USER JOINED EVENT:");
-                console.log("- New User ID:", id);
-                console.log("- All Clients:", clients);
-                console.log("- Clients with usernames:", clientsWithUsernames);
-                console.log("- My ID:", socketIdRef.current);
-                console.log("- Am I the new user?", id === socketIdRef.current);
+                console.log('👥========== USER JOINED EVENT ==========');
+                console.log('🆔 New User ID:', id);
+                console.log('👤 My Socket ID:', socketIdRef.current);
+                console.log('🤝 Am I the new user?', id === socketIdRef.current);
+                console.log('📋 All Clients:', clients);
+                console.log('📝 Clients with usernames:', clientsWithUsernames);
+                console.log('🎬 Current videos count:', videos.length);
+                console.log('📺 Current videos:', videos.map(v => ({id: v.socketId.slice(-4), username: v.username})));
+                console.log('🔗 Current connections count:', Object.keys(connections).length);
+                console.log('🔗 Current connection IDs:', Object.keys(connections).map(id => id.slice(-4)));
+                console.log('⏰ Timestamp:', new Date().toISOString());
                 
-                // Prevent processing if this is a duplicate event
+                // Check for recent duplicate events
+                const now = Date.now();
                 if (window.lastUserJoinedEvent && 
                     window.lastUserJoinedEvent.id === id && 
-                    window.lastUserJoinedEvent.timestamp > Date.now() - 1000) {
-                    console.log("🚫 DUPLICATE USER JOINED EVENT DETECTED - IGNORING");
+                    window.lastUserJoinedEvent.timestamp > now - 2000) {
+                    console.log('🚫========== DUPLICATE DETECTED ==========');
+                    console.log('🚫 Previous event timestamp:', new Date(window.lastUserJoinedEvent.timestamp).toISOString());
+                    console.log('🚫 Time difference:', now - window.lastUserJoinedEvent.timestamp, 'ms');
+                    console.log('🚫 IGNORING THIS EVENT');
+                    console.log('🚫========== END DUPLICATE ==========');
                     return;
                 }
                 
                 // Store this event to prevent duplicates
-                window.lastUserJoinedEvent = { id, timestamp: Date.now() };
+                window.lastUserJoinedEvent = { id, timestamp: now };
+                console.log('✅ Event stored for duplicate prevention');
                 
-                // Store usernames for all clients - ENHANCED MAPPING
+                // Enhanced username mapping logging
                 const userMap = {};
-                
-                // Add my own username first
                 const myUsername = window.currentUsername || username || 'Me';
                 userMap[socketIdRef.current] = myUsername;
-                console.log(`🔗 Added my username: ${socketIdRef.current} → ${myUsername}`);
+                console.log(`� My username mapping: ${socketIdRef.current.slice(-4)} → "${myUsername}"`);
                 
                 if (clientsWithUsernames && Array.isArray(clientsWithUsernames)) {
-                    clientsWithUsernames.forEach(client => {
+                    console.log('📝 Processing username mappings:');
+                    clientsWithUsernames.forEach((client, index) => {
                         if (client && client.socketId && client.username) {
-                            // Don't overwrite with Unknown values if we have a better name
-                            if (client.username.startsWith('Unknown-') && userMap[client.socketId] && !userMap[client.socketId].startsWith('Unknown-')) {
-                                console.log(` Keeping existing username for ${client.socketId}: ${userMap[client.socketId]} (ignoring ${client.username})`);
-                            } else {
-                                userMap[client.socketId] = client.username;
-                                console.log(`Mapped ${client.socketId} → ${client.username}`);
-                            }
+                            userMap[client.socketId] = client.username;
+                            console.log(`   ${index + 1}. ${client.socketId.slice(-4)} → "${client.username}"`);
+                        } else {
+                            console.log(`   ${index + 1}. Invalid client:`, client);
                         }
                     });
-                    console.log(" Final userMap:", userMap);
                 } else {
-                    console.log(" No valid clientsWithUsernames received");
-                    // Fallback: create userMap with available info
-                    if (clients && Array.isArray(clients)) {
-                        clients.forEach(clientId => {
-                            if (clientId === socketIdRef.current) {
-                                userMap[clientId] = myUsername;
-                            } else if (!userMap[clientId]) {
-                                userMap[clientId] = `User ${clientId.slice(-4)}`;
-                            }
-                        });
-                        console.log(" Fallback userMap:", userMap);
-                    }
+                    console.log('⚠️ No valid clientsWithUsernames received');
                 }
+                console.log('🗺️ Final userMap:', Object.fromEntries(Object.entries(userMap).map(([k,v]) => [k.slice(-4), v])));
 
                 const currentConnectionCount = Object.keys(connections).length;
-                console.log(` Current connections: ${currentConnectionCount}, Expected: ${clients.length - 1}`);
+                console.log(`📊 Connection Stats: Current=${currentConnectionCount}, Expected=${(clients?.length || 1) - 1}`);
+                
+                console.log('🔧========== PROCESSING CONNECTIONS ==========');
                 
                 clients.forEach((socketListId) => {
                     // Skip setting up connection to myself
@@ -1360,6 +1382,15 @@ Video Element Status:
         // Store username globally for socket connection
         window.currentUsername = username.trim();
         console.log('🔵 Stored username globally:', window.currentUsername);
+        
+        // DEBUG: Expose username and other debug info
+        window.debugUsername = username.trim();
+        window.debugInfo = {
+            username: username.trim(),
+            serverUrl: server_url,
+            environment: process.env.NODE_ENV
+        };
+        console.log('🔧 DEBUG: Exposed window.debugUsername and window.debugInfo');
         
         // Stop preview stream before connecting
         if (localVideoref.current && localVideoref.current.srcObject) {

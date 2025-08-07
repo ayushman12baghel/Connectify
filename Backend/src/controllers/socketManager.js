@@ -5,6 +5,10 @@ let messages = {};
 let timeOnline = {};
 let usernames = {}; // Store usernames for each socket
 
+// Production debugging: Track server restarts
+let serverStartTime = new Date();
+console.log(`🚀 SocketManager initialized at: ${serverStartTime}`);
+
 export const connectToSocket = (server) => {
   const io = new Server(server, {
     cors: {
@@ -13,37 +17,41 @@ export const connectToSocket = (server) => {
       allowedHeaders: ["*"],
       credentials: true,
     },
-    // Production-specific settings for Render
+    // Render-compatible settings
     transports: ['websocket', 'polling'],
-    allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000,
-    // Enable sticky sessions for production
-    sticky: true,
-    // Prevent connection issues in production
     allowUpgrades: true,
-    maxHttpBufferSize: 1e6
+    maxHttpBufferSize: 1e6,
+    // Remove sticky - not supported in constructor
+    connectTimeout: 45000
   });
 
   io.on("connection", (socket) => {
-    console.log("Something Connected");
+    console.log("✅ NEW CONNECTION:", socket.id);
+    console.log("🌍 Environment:", process.env.NODE_ENV || 'development');
+    console.log("🔗 Total active connections:", io.engine.clientsCount);
     
     // Handle user joining with username
     socket.on("join-call", (path, username) => {
       console.log(`📞 JOIN-CALL received: path=${path}, username="${username}", socketId=${socket.id}`);
+      console.log(`🏠 Current room state for ${path}:`, connections[path] || 'empty');
       
       if (connections[path] == undefined) {
         connections[path] = [];
+        console.log(`🆕 Created new room: ${path}`);
       }
       
       // PRODUCTION FIX: Prevent duplicate socket IDs in the same room
       if (connections[path].includes(socket.id)) {
-        console.log(`⚠️ Socket ${socket.id} already in room ${path} - preventing duplicate`);
+        console.log(`⚠️ DUPLICATE DETECTED: Socket ${socket.id} already in room ${path} - preventing duplicate`);
+        console.log(`🔍 Current room participants:`, connections[path]);
         return; // Don't add duplicate
       }
       
       connections[path].push(socket.id);
       console.log(`✅ Added ${socket.id} to room ${path}. Total participants: ${connections[path].length}`);
+      console.log(`🎯 Final room state:`, connections[path]);
 
       // Store username for this socket - ENHANCED: Ensure username is stored correctly
       if (username && typeof username === 'string' && username.trim()) {
@@ -141,6 +149,9 @@ export const connectToSocket = (server) => {
     });
 
     socket.on("disconnect", () => {
+      console.log(`🔌 DISCONNECT: Socket ${socket.id} disconnected`);
+      console.log(`⏰ Server uptime: ${(new Date() - serverStartTime) / 1000}s`);
+      
       var diffTime = Math.abs(timeOnline[socket.id] - new Date());
 
       // Clean up username
@@ -153,6 +164,9 @@ export const connectToSocket = (server) => {
         for (let a = 0; a < v.length; a++) {
           if (v[a] == socket.id) {
             key = k;
+            console.log(`🏠 Removing ${socket.id} from room ${key}`);
+            console.log(`👥 Room ${key} before removal:`, connections[key]);
+            
             for (let b = 0; b < connections[key].length; ++b) {
               const socketId = connections[key][b];
               io.to(socketId).emit("user-left", socket.id);
@@ -160,8 +174,11 @@ export const connectToSocket = (server) => {
 
             var index = connections[key].indexOf(socket.id);
             connections[key].splice(index, 1);
+            
+            console.log(`👥 Room ${key} after removal:`, connections[key]);
 
             if (connections[key].length == 0) {
+              console.log(`🗑️ Deleting empty room: ${key}`);
               delete connections[key];
             }
           }
